@@ -46,7 +46,7 @@ class BulkPOItemExtractor:
 
     def extract_po_metadata(self, text: str) -> Dict[str, str]:
         metadata = {}
-        
+
         # Extract PO Number (Document Ref)
         po_number_match = re.search(r'Document Ref:\s*(\d+)', text)
         if po_number_match:
@@ -55,11 +55,11 @@ class BulkPOItemExtractor:
         # Extract Vendor/Location
         vendor_location_match = re.search(r'Vendor.*?\n(.*?)\n', text, re.DOTALL)
         if vendor_location_match:
-            vendor_text = vendor_location_match.group(1).strip()
-            # Remove vendor name (everything before the first uppercase location) and Document Ref
-            vendor_text = re.sub(r'^.*?\b(ISB|LHR|KHI|MEGA|HMK)\b', r'\1', vendor_text, flags=re.IGNORECASE)
-            vendor_text = re.sub(r'Document Ref.*', '', vendor_text, flags=re.IGNORECASE).strip()
-            metadata['vendor_location'] = vendor_text
+            full_line = vendor_location_match.group(1).strip()
+            # Match first occurrence of location code pattern (e.g., GUJ - MEGA - CQLA)
+            location_match = re.search(r'([A-Z]{2,3}\s*-\s*[A-Z]+(?:\s*-\s*[A-Z]+)*)', full_line)
+            if location_match:
+                metadata['vendor_location'] = location_match.group(1).strip()
 
         # Extract PO Date
         po_date_match = re.search(r'PO Date:\s*(\d{2}\.\d{2}\.\d{4})', text)
@@ -91,7 +91,6 @@ class BulkPOItemExtractor:
         return items
 
     def get_short_po_name(self, po_file: str, metadata: Dict = None) -> str:
-        # Use PO Number if available for naming
         if metadata and 'po_number' in metadata:
             return metadata['po_number']
         return po_file.replace('.pdf', '')[:20].replace(' ', '_')
@@ -121,7 +120,7 @@ class BulkPOItemExtractor:
     def save_to_excel(self, output_file: str = 'po_analysis.xlsx'):
         try:
             with pd.ExcelWriter(os.path.join(self.folder_path, output_file), engine='openpyxl') as writer:
-                
+
                 # PO Summary Sheet
                 po_summary_data = []
                 for f, d in self.all_pos_data.items():
